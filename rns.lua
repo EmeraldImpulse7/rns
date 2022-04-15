@@ -1,29 +1,39 @@
 --Rednet Secure (RNS)
 
---custom require from http go brrrrrrrrrrrrr
 package.loaders[#package.loaders + 1] = function(name)
+    --if it doesnt start with "http" then bye
     if not name:find("^http") then
         return nil, "not a URL"
     end
 
+    --cache folder for storing cached modules
     local localPathRoot = "/.cache/rns/"
-    local filename = name:gsub("%.lua$",""):gsub(".*/","")..".lua"
+    --creating a filename from a url ("http://example.com/example.lua" -> example.lua)
+    local filename = name:gsub("%.lua$",""):gsub(".*/","") .. ".lua"
 
+    --make filepath for cached module
     local localPath = localPathRoot .. filename
+    --if the file doesn't exist, make it
     if not fs.exists(localPath) then
+        --grab the online file
         local request, err = http.get(name)
         if request then
+            --write that to a file in the cache folder
             io.open(localPath, "w"):write(request.readAll()):close()
             request.close()
         else
+            --if not, error
             return nil, "Cannot download " .. name .. ": " .. err
         end
     end
 
+    --now we're gonna load it as a module
     local fn, err = loadfile(localPath, nil, _ENV)
     if fn then
+        --if it works, great, here, use it
         return fn, localPath
     else
+        --if not, here's an error
         return nil, err
     end
 end
@@ -67,14 +77,9 @@ local function errorCheck(table)
     end
 end
 
-function rns.handshakeClient(serverID, randStr)
-    --randStr an optional argument, can be inputed if you have your own method of random string generation
-    --may remove
+function rns.handshakeClient(serverID)
     expect(1, serverID, "number")
-    expect(2, randStr, "string", "nil")
-    if not randStr then
-        randStr = randomString(128)
-    end
+    randStr = randomString(128)
 
     rns.send(serverID, { version=rns.version, randStr=randStr }, "ClientHello")
 
@@ -84,13 +89,13 @@ end
 
 function rns.handshakeServer()
     local id, message = rednet.receive("ClientHello")
-    if message.version ~= rns.version then
-        rns.send(id, { error="Incompatable versions! You're on "..message.version..", while I'm on "..rns.version.."!" }, "ServerHello")
-        print("sent error")
-        do return end
-    else
-        rns.send(id, {}, "ServerHello")
-    end
+    if message.version ~= rns.version then rns.send(id, { error="Incompatable versions! You're on "..message.version..", while I'm on "..rns.version.."!" }, "ServerHello") ; return end
+
+    local clientRandom = message.randStr
+
+
+    rns.send(id, { certificate={ publicKey } }, "ServerHello")
+
 end
 
 --[[

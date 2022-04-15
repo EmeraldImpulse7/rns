@@ -39,6 +39,6 @@
         "unused-local",
         "lowercase-global",
         "unused-function",
-        "redundant-parameter"
+        "undefined-field"
     ]
 }
