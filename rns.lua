@@ -1,24 +1,45 @@
 --Rednet Secure (RNS)
 
+--custom require from http go brrrrrrrrrrrrr
+package.loaders[#package.loaders + 1] = function(name)
+    if not name:find("^http") then
+        return nil, "not a URL"
+    end
+
+    local localPathRoot = "/.cache/rns/"
+    local filename = name:gsub("%.lua$",""):gsub(".*/","")..".lua"
+
+    local localPath = localPathRoot .. filename
+    if not fs.exists(localPath) then
+        local request, err = http.get(name)
+        if request then
+            io.open(localPath, "w"):write(request.readAll()):close()
+            request.close()
+        else
+            return nil, "Cannot download " .. name .. ": " .. err
+        end
+    end
+
+    local fn, err = loadfile(localPath, nil, _ENV)
+    if fn then
+        return fn, localPath
+    else
+        return nil, err
+    end
+end
+
 --set up our good old library table and shadow the default rednet api
 --might change later, may want to implement regular unencrypted TCP
 --probably gonna have to make another library for that, and then make it a dependency for this
 --or i could have rns implement both TCP and encryption but that's kinda dumb cause its specifically for encryption
 --idk
-local rns = { version=1.0 }
+local rns = { version=0.1 }
 for k, v in pairs(rednet) do rns[k] = v end
 local expect = require "cc.expect"
-local expect = expect.expect
+expect = expect.expect
 
---Thank you, PedroAlvesV.
---https://gist.github.com/PedroAlvesV/ea80f6724df49ace29eed03e7f75b589
-if not fs.exists("sha2for51.lua") then
-    shell.run("wget https://gist.github.com/PedroAlvesV/ea80f6724df49ace29eed03e7f75b589/raw/fe5787dbc242009e9be07438ab84d59c68e11082/sha2for51.lua")
-end
-local sha = require("sha2for51")
+local sha = require("https://pastebin.com/raw/6UV4qfNF")
 
---note: when you get home, find who made this and credit them.
---used for the shared secret
 local function randomString(length)
     math.randomseed(os.time())
     local character_set = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
@@ -55,7 +76,7 @@ function rns.handshakeClient(serverID, randStr)
         randStr = randomString(128)
     end
 
-    rns.send(serverID, { version=rns.version, randNum=randNum }, "ClientHello")
+    rns.send(serverID, { version=rns.version, randStr=randStr }, "ClientHello")
 
     local id, message = rednet.receive("ServerHello")
     assert(errorCheck(message))
